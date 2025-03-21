@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>在线节拍器 - 改进版</title>
+  <style>
+    /* 基本重置 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(to bottom right, #66ccff, #ffcc99);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 2rem;
+      color: #333;
+    }
+
+    .metronome-container {
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      padding: 20px 30px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+
+    .row {
+      margin: 10px 0;
+    }
+
+    .bpm-controls button {
+      font-size: 1.2rem;
+      padding: 6px 12px;
+      margin: 0 5px;
+      border: none;
+      border-radius: 4px;
+      background-color: #ff9966;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .bpm-controls button:hover {
+      background-color: #ff704d;
+    }
+
+    .bpm-controls input[type="number"] {
+      font-size: 1.2rem;
+      width: 70px;
+      text-align: center;
+      margin: 0 5px;
+      padding: 4px;
+    }
+
+    #startStopBtn {
+      font-size: 1.1rem;
+      padding: 10px 20px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 4px;
+      background-color: #66cc66;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    #startStopBtn:hover {
+      background-color: #55aa55;
+    }
+
+    .display {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin: 20px 0;
+      color: #333;
+      height: 50px; /* 保留空间防止跳动 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* 高亮首拍 */
+    .first-beat {
+      color: #e74c3c;
+      animation: scaleUp 0.15s ease-in;
+    }
+
+    @keyframes scaleUp {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.2); }
+    }
+
+    select {
+      font-size: 1rem;
+      padding: 4px 8px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="metronome-container">
+    <h1>在线节拍器 - 改进版</h1>
+
+    <div class="row">
+      <label for="timeSignatureSelect">拍号：</label>
+      <select id="timeSignatureSelect">
+        <option value="2">2/4</option>
+        <option value="3">3/4</option>
+        <option value="4" selected>4/4</option>
+        <option value="6">6/8</option>
+      </select>
+    </div>
+
+    <div class="row bpm-controls">
+      <button id="minusBpmBtn">-</button>
+      <input type="number" id="bpmInput" min="30" max="260" value="120">
+      <button id="plusBpmBtn">+</button>
+    </div>
+
+    <button id="startStopBtn">开始</button>
+    <div class="display" id="beatDisplay">1</div>
+  </div>
+
+  <script>
+    let bpm = 120;         // 默认BPM
+    let isPlaying = false; // 播放状态
+    let currentBeat = 1;   // 当前拍数
+    let maxBeat = 4;       // 默认4/4拍
+    let timer = null;      // setInterval引用
+
+    const bpmInput = document.getElementById('bpmInput');
+    const minusBpmBtn = document.getElementById('minusBpmBtn');
+    const plusBpmBtn = document.getElementById('plusBpmBtn');
+    const startStopBtn = document.getElementById('startStopBtn');
+    const beatDisplay = document.getElementById('beatDisplay');
+    const timeSignatureSelect = document.getElementById('timeSignatureSelect');
+
+    // 更新BPM
+    function updateBpm(newBpm) {
+      bpm = Math.max(30, Math.min(260, newBpm));
+      bpmInput.value = bpm;
+    }
+
+    // 开始/暂停
+    function toggleMetronome() {
+      if (!isPlaying) {
+        startMetronome();
+      } else {
+        stopMetronome();
+      }
+    }
+
+    function startMetronome() {
+      isPlaying = true;
+      startStopBtn.textContent = '暂停';
+      const interval = 60000 / bpm;
+      timer = setInterval(playBeat, interval);
+    }
+
+    function stopMetronome() {
+      isPlaying = false;
+      startStopBtn.textContent = '开始';
+      clearInterval(timer);
+      timer = null;
+      currentBeat = 1;
+      beatDisplay.textContent = currentBeat;
+      beatDisplay.classList.remove('first-beat');
+    }
+
+    function playBeat() {
+      // 显示当前拍
+      beatDisplay.textContent = currentBeat;
+      
+      // 判断是否首拍
+      if (currentBeat === 1) {
+        beatDisplay.classList.add('first-beat');
+        playClickSound(880);   // 880Hz = 高音
+      } else {
+        beatDisplay.classList.remove('first-beat');
+        playClickSound(440);   // 440Hz = 普通音
+      }
+
+      // 拍数增加
+      currentBeat++;
+      if (currentBeat > maxBeat) {
+        currentBeat = 1;
+      }
+    }
+
+    // 用Web Audio API生成“哔”声
+    function playClickSound(freq) {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      oscillator.connect(audioCtx.destination);
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        audioCtx.close();
+      }, 100); 
+    }
+
+    // BPM变化后，重启节拍器
+    function restartMetronome() {
+      if (timer) {
+        clearInterval(timer);
+      }
+      const interval = 60000 / bpm;
+      timer = setInterval(playBeat, interval);
+    }
+
+    // --- 事件监听 ---
+    minusBpmBtn.addEventListener('click', () => {
+      updateBpm(bpm - 1);
+      if (isPlaying) restartMetronome();
+    });
+
+    plusBpmBtn.addEventListener('click', () => {
+      updateBpm(bpm + 1);
+      if (isPlaying) restartMetronome();
+    });
+
+    bpmInput.addEventListener('change', (e) => {
+      updateBpm(parseInt(e.target.value, 10));
+      if (isPlaying) restartMetronome();
+    });
+
+    startStopBtn.addEventListener('click', toggleMetronome);
+
+    // 根据选中的拍号，更新 maxBeat
+    timeSignatureSelect.addEventListener('change', (e) => {
+      const val = parseInt(e.target.value, 10);
+      // 如果是 6/8 拍，我们认为是 6拍循环
+      // 对于 2/4 => 2拍, 3/4 =>3拍, 4/4=>4拍
+      // 其实 6/8 跟 6拍类似，但要看音乐理论
+      // 我们先简单做6拍吧
+      maxBeat = val;
+      stopMetronome();  // 重置拍子
+    });
+  </script>
+</body>
+</html>
